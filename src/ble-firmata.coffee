@@ -123,17 +123,21 @@ exports = module.exports = class BLEFirmata extends events.EventEmitter2
     @write write_data, callback
 
   sendI2CConfig: (delay, callback) ->
-    delay = delay || 0;
+    delay = delay || 0
     data = [(delay & 0xFF), ((delay >> 8) & 0xFF)]
     @sysex BLEFirmata.I2C_CONFIG, data, callback
 
   sendI2CWriteRequest: (slaveAddress, bytes, callback) ->
-    data = []
-    data[0] = (slaveAddress);
-    data[1] = (BLEFirmata.I2C_MODES.WRITE << 3);
+    data = [slaveAddress, (BLEFirmata.I2C_MODES.WRITE << 3)]
     bytes.map (i) ->
       data.concat [(bytes[i] & 0x7F), (bytes[i] >> 7) & 0x7F]
     @sysex BLEFirmata.I2C_REQUEST, data, callback
+
+  sendI2CReadRequest: (slaveAddress, numBytes, callback) ->
+    data = [slaveAddress, BLEFirmata.I2C_MODES.READ << 3, numBytes & 0x7F, (numBytes >> 7) & 0x7F]
+    @once 'I2C-reply-' + slaveAddress, (replyBuffer) ->
+      callback replyBuffer
+    @sysex BLEFirmata.I2C_REQUEST, data
 
   pinMode: (pin, mode, callback) ->
     switch mode
@@ -211,6 +215,14 @@ exports = module.exports = class BLEFirmata extends events.EventEmitter2
                 value: analog_value,
                 old_value: old_analog_value
               }
+          when BLEFirmata.I2C_REPLY
+            replyBuffer = []
+            slaveAddress = (@stored_input_data[2] & 0x7F) | ((@stored_input_data[3] & 0x7F) << 7)
+            register = (@stored_input_data[4] & 0x7F) | ((@stored_input_data[5] & 0x7F) << 7)
+            length = @stored_input_data.length - 1
+            replyBuffer = for i in [6 ... length] by 2
+              stored_input_data[i] | (this.stored_input_data[i + 1] << 7)
+            @emit 'I2C-reply-' + slaveAddress, replyBuffer
           when BLEFirmata.REPORT_VERSION
             @boardVersion = "#{@stored_input_data[1]}.#{@stored_input_data[0]}"
             @emit 'boardVersion', @boardVersion
