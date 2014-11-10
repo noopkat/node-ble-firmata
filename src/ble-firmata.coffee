@@ -237,6 +237,7 @@ exports = module.exports = class BLEFirmata extends events.EventEmitter2
         @sysex_bytes_read = 0
       else if command is BLEFirmata.DIGITAL_MESSAGE or
               command is BLEFirmata.ANALOG_MESSAGE or
-              command is BLEFirmata.REPORT_VERSION
+              command is BLEFirmata.REPORT_VERSION or
+              command is BLEFirmata.I2C_REPLY
         @wait_for_data = 2
         @execute_multi_byte_command = command
